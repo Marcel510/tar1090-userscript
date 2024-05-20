@@ -4,12 +4,14 @@
 // @description  Adds some features for tar1090 instances. Currently: measure distance between aircraft
 // @match        https://globe.adsbexchange.com/*
 // @match        https://globe.adsb.fi/*
+// @match        https://adsb.lol/*
 // @run-at       document-idle
 // ==/UserScript==
 
 let shiftPressed = false;
 let activeHex = null;
 let selectedPlanePairs = [];
+let distanceVectorSource;
 
 const styleFunction = (feature) => {
     return [
@@ -73,22 +75,20 @@ function distanceFromHex(first, second) {
     return distance.toFixed(1);
 }
 
-const vectorSource = new ol.source.Vector({
-    features: []
-});
-
-const vectorLayer = new ol.layer.Vector({
-    source: vectorSource,
-    style: styleFunction
-});
-
 function initMapLayer() {
-    OLMap.addLayer(vectorLayer)
+    distanceVectorSource = new ol.source.Vector({
+        features: []
+    });
+    const distanceVectorLayer = new ol.layer.Vector({
+        source: distanceVectorSource,
+        style: styleFunction
+    });
+    OLMap.addLayer(distanceVectorLayer)
 }
 
 
 function mapRefreshHook(redraw) {
-    vectorSource.forEachFeature(feature => {
+    distanceVectorSource.forEachFeature(feature => {
         let first = feature.get("first");
         let second = feature.get("second");
         feature.setGeometry(new ol.geom.LineString(coordsFromHex(first, second)));
@@ -96,7 +96,7 @@ function mapRefreshHook(redraw) {
     });
 }
 function removeFeatureByFirstAndSecond(first, second) {
-    const features = vectorSource.getFeatures();
+    const features = distanceVectorSource.getFeatures();
     for (let i = 0; i < features.length; i++) {
         const feature = features[i];
         if (feature.get('first') === first && feature.get('second') === second) {
@@ -121,7 +121,7 @@ function selectPair(hex, otherHex) {
             geometry: new ol.geom.LineString(coordsFromHex(first, second)),
             name: distanceFromHex(first, second) // Add a property for the label
         });
-        vectorSource.addFeature(newFeature);
+        distanceVectorSource.addFeature(newFeature);
     }
 }
 function selectPlaneByHexHook(hex, options) {
@@ -140,7 +140,7 @@ function selectPlaneByHexHook(hex, options) {
 }
 function resetDistances() {
     selectedPlanePairs = [];
-    vectorSource.clear()
+    distanceVectorSource.clear()
 }
 
 function init() {
@@ -179,4 +179,5 @@ function addEventListeners() {
     });
 }
 
-init();
+// adsb.fi/adsb.lol need delayed init otherwise functions defined by tar1090 such as mapRefresh are not defined
+setTimeout(init, 1000)
